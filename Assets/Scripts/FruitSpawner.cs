@@ -45,7 +45,8 @@ public class FruitSpawner : MonoBehaviour
             GameObject fruit = Instantiate(fruitPrefabs[fruitIndex], transform.position, Quaternion.identity);
             // disable the fruit's collider
             fruit.name = "Fruit";
-            fruit.GetComponent<Rigidbody2D>().isKinematic = true;
+            fruit.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Kinematic;
+
             fruitExists = true;
 
             // Reset the cooldown timer
@@ -68,7 +69,7 @@ public class FruitSpawner : MonoBehaviour
             if (fruit != null)
             {
                 fruit.name = currentFruitName;
-                fruit.GetComponent<Rigidbody2D>().isKinematic = false;
+                fruit.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
                 fruit.layer = 6;
                 fruitExists = false;
                 previousSpawnTime = Time.time;

@@ -60,7 +60,7 @@ public class CombineCheck : MonoBehaviour
             newFruit.name = this.fruitPrefabs[fruitIndex + 1].name;
 
             // Make sure the rigidbody is not kinematic
-            newFruit.GetComponent<Rigidbody2D>().isKinematic = false;
+            newFruit.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
 
             // Delay the destruction of the current fruit
             yield return new WaitForSeconds(0.1f); // Adjust the delay as needed
