@@ -1,51 +1,47 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 public class CombineCheck : MonoBehaviour
 {
-    public GameObject[] fruitPrefabs;
+    [SerializeField] private GameObject[] fruitPrefabs;
 
     private Coroutine mergingCoroutine;
+    private static HashSet<int> mergingFruits = new HashSet<int>();
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (collision.gameObject.name == transform.gameObject.name)
+        if (collision.gameObject.name != transform.gameObject.name)
+            return; // Only merge fruits of the same type
+
+        int thisID = GetInstanceID();
+        int otherID = collision.gameObject.GetInstanceID();
+
+        // Check if either fruit is already merging
+        if (mergingFruits.Contains(thisID) || mergingFruits.Contains(otherID))
+            return;
+
+        // Add current fruit and the colliding fruit to the merging set
+        mergingFruits.Add(thisID);
+        mergingFruits.Add(otherID);
+
+        CombineCheck masterFruit = DetermineMasterFruit(collision.gameObject.GetComponent<CombineCheck>());
+
+        if (masterFruit == this)
         {
-            // increase the score on the "score" TextMeshPro gameobject by floor(index * 2.5 + 1)
-            GameObject scoreText = GameObject.Find("score");
-            if (scoreText != null)
+            if (mergingCoroutine != null)
             {
-                TextMeshProUGUI scoreTextMesh = scoreText.GetComponent<TextMeshProUGUI>();
-                if (scoreTextMesh != null)
-                {
-                    int fruitIndex = System.Array.FindIndex(this.fruitPrefabs, fruit => fruit.name == transform.gameObject.name);
-                    string newScore = (int.Parse(scoreTextMesh.text) + (int)Mathf.Floor(fruitIndex * 2.25f + 1f)).ToString();
-                    scoreTextMesh.text = newScore;
-                    GameObject.Find("FinalScore").GetComponent<TextMeshProUGUI>().text = newScore;
-                }
+                StopCoroutine(mergingCoroutine);
             }
 
-
-            // Determine the master fruit based on their unique identifiers
-            CombineCheck masterFruit = DetermineMasterFruit(collision.gameObject.GetComponent<CombineCheck>());
-
-            if (masterFruit == this)
-            {
-                if (mergingCoroutine != null)
-                {
-                    StopCoroutine(mergingCoroutine);
-                }
-
-                mergingCoroutine = StartCoroutine(HandleCollision(collision));
-            }
+            mergingCoroutine = StartCoroutine(HandleCollision(collision));
         }
     }
 
     private CombineCheck DetermineMasterFruit(CombineCheck otherCombineCheck)
     {
-        // Compare unique criteria to determine the master fruit
-        // In this example, we use the instance ID as a simple criterion
+        // Determine which fruit should control the merge based on instance ID
         return (GetInstanceID() > otherCombineCheck.GetInstanceID()) ? this : otherCombineCheck;
     }
 
@@ -55,25 +51,62 @@ public class CombineCheck : MonoBehaviour
 
         if (fruitIndex < this.fruitPrefabs.Length - 1)
         {
+            // Destroy the two merging fruits
             Destroy(collision.gameObject);
+
+            // Instantiate the next level of fruit
             GameObject newFruit = Instantiate(this.fruitPrefabs[fruitIndex + 1], transform.position, Quaternion.identity);
             newFruit.name = this.fruitPrefabs[fruitIndex + 1].name;
 
-            // Make sure the rigidbody is not kinematic
-            newFruit.GetComponent<Rigidbody2D>().bodyType = RigidbodyType2D.Dynamic;
+            // Ensure the Rigidbody2D is set to Dynamic
+            Rigidbody2D rb = newFruit.GetComponent<Rigidbody2D>();
+            if (rb != null) rb.bodyType = RigidbodyType2D.Dynamic;
 
-            // Delay the destruction of the current fruit
-            yield return new WaitForSeconds(0.1f); // Adjust the delay as needed
+            // Delay to allow merge effect and to reset remaining fruit
+            yield return new WaitForSeconds(0.1f);
+
             Destroy(gameObject);
 
-            // Play the sound effect "pop.wav" in the "Audio Source" component in the "Spawner" gameobject
-            GameObject spawner = GameObject.Find("Spawner");
-            if (spawner != null)
+            // Play merge sound and update score
+            PlayMergeSound();
+            UpdateScore(fruitIndex);
+        }
+
+        // Remove current fruit from merging list to allow further merges
+        mergingFruits.Remove(GetInstanceID());
+    }
+
+    private void PlayMergeSound()
+    {
+        GameObject spawner = GameObject.Find("Spawner");
+        if (spawner != null)
+        {
+            AudioSource audioSource = spawner.GetComponent<AudioSource>();
+            if (audioSource != null)
             {
-                AudioSource audioSource = spawner.GetComponent<AudioSource>();
-                if (audioSource != null)
+                audioSource.Play();
+            }
+        }
+    }
+
+    private void UpdateScore(int fruitIndex)
+    {
+        GameObject scoreText = GameObject.Find("score");
+        TextMeshProUGUI scoreTextMesh = scoreText?.GetComponent<TextMeshProUGUI>();
+
+        if (scoreTextMesh != null)
+        {
+            int newScore = int.Parse(scoreTextMesh.text) + (int)Mathf.Floor(fruitIndex * 2.25f + 1f);
+            scoreTextMesh.text = newScore.ToString();
+
+            // Fix the issue with FinalScore text
+            GameObject finalScoreObject = GameObject.Find("FinalScore");
+            if (finalScoreObject != null)
+            {
+                TextMeshProUGUI finalScoreText = finalScoreObject.GetComponent<TextMeshProUGUI>();
+                if (finalScoreText != null)
                 {
-                    audioSource.Play();
+                    finalScoreText.text = newScore.ToString();
                 }
             }
         }
@@ -81,10 +114,7 @@ public class CombineCheck : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Stop the coroutine when the script is destroyed
-        if (mergingCoroutine != null)
-        {
-            StopCoroutine(mergingCoroutine);
-        }
+        // Ensure fruit ID is removed from merging set on destruction
+        mergingFruits.Remove(GetInstanceID());
     }
 }
